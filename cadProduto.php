@@ -1,41 +1,50 @@
 <?php
 
-// Configuração de Erros (útil durante o desenvolvimento)
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-// Define o cabeçalho da resposta como JSON
+// Define o tipo de conteúdo como JSON para a resposta
 header('Content-Type: application/json');
 
-// --- Inclusão e Conexão com o Banco de Dados ---
-require_once 'conexao.php'; // Certifique-se de que 'conexao.php' retorna a variável $con
+// Inclui o arquivo de conexão com o banco de dados
+require_once 'conexao.php';
+// Define o charset para UTF-8
 $con->set_charset("utf8");
 
-// --- Processamento da Requisição JSON ---
-
-// Obtém o corpo da requisição e decodifica o JSON
+// Obtém o input JSON da requisição
 $jsonParam = json_decode(file_get_contents('php://input'), true);
 
 if (!$jsonParam) {
-    echo json_encode(['success' => false, 'message' => 'Dados JSON inválidos ou ausentes na requisição.']);
+    echo json_encode(['success' => false, 'message' => 'Dados JSON inválidos ou ausentes.']);
     exit;
 }
 
-// Extrai, trata e valida os dados para a tabela 'fornecedor'
-$Nome          = trim($jsonParam['Nome'] ?? '');
-$Cnpj          = trim($jsonParam['Cnpj'] ?? '');
-$nmResponsavel = trim($jsonParam['nmResponsavel'] ?? '');
-$nrContato     = trim($jsonParam['nrContato'] ?? '');
-// flListaNegra deve ser 'S' ou 'N' e tem 1 caractere (CHAR)
-$flListaNegra  = strtoupper(trim($jsonParam['flListaNegra'] ?? 'N'));
+// --- Extração e Validação dos Dados para a Tabela 'produto' ---
 
-// --- Preparação e Execução da Consulta ---
+// Assume-se que todos os campos string (varchar) no seu DDL são não-nulos.
+// Os campos são: nmProduto, nrQuantidade, nrIdentificacao, Valor.
+$nmProduto       = trim($jsonParam['nmProduto'] ?? '');
+$nrQuantidade    = trim($jsonParam['nrQuantidade'] ?? '');
+$nrIdentificacao = trim($jsonParam['nrIdentificacao'] ?? '');
+$Valor           = trim($jsonParam['Valor'] ?? '');
+// O campo Disponivel é CHAR(1). 
+// Pode-se assumir 'S' ou 'N' ou você pode ajustar a lógica se houver um padrão específico.
+$Disponivel      = strtoupper(trim($jsonParam['Disponivel'] ?? 'N')); // Padrão 'N'
+// O campo idMarca é INT, chave estrangeira.
+$idMarca         = intval($jsonParam['idMarca'] ?? 0);
 
-// Prepara a consulta SQL para a tabela `fornecedor`
+// Uma validação básica para garantir que campos obrigatórios não estejam vazios
+if (empty($nmProduto) || empty($nrQuantidade) || empty($nrIdentificacao) || empty($Valor) || $idMarca <= 0) {
+    echo json_encode(['success' => false, 'message' => 'Campos obrigatórios (nmProduto, nrQuantidade, nrIdentificacao, Valor, idMarca) não podem estar vazios.']);
+    exit;
+}
+
+// --- Preparação da Consulta INSERT ---
+
 $stmt = $con->prepare("
-    INSERT INTO fornecedor (Nome, Cnpj, nmResponsavel, nrContato, flListaNegra)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO produto (nmProduto, nrQuantidade, nrIdentificacao, Valor, Disponivel, idMarca)
+    VALUES (?, ?, ?, ?, ?, ?)
 ");
 
 if (!$stmt) {
@@ -43,35 +52,40 @@ if (!$stmt) {
     exit;
 }
 
-// O tipo de dados é: s=string, s=string, s=string, s=string, s=string/char
-// Observação: 'flListaNegra' é CHAR(1), mas usamos 's' (string) no bind.
-$stmt->bind_param("sssss", $Nome, $Cnpj, $nmResponsavel, $nrContato, $flListaNegra);
+// Tipos de dados para bind_param:
+// s: string (nmProduto, nrQuantidade, nrIdentificacao, Valor, Disponivel)
+// i: integer (idMarca)
+$stmt->bind_param("sssssi", $nmProduto, $nrQuantidade, $nrIdentificacao, $Valor, $Disponivel, $idMarca);
 
-// Executa a consulta
+// --- Execução da Consulta e Retorno do Resultado ---
+
 if ($stmt->execute()) {
-    $idInserido = $stmt->insert_id; // Pega o ID gerado automaticamente
+    // Retorna o ID do produto inserido (opcional)
+    $idProduto = $con->insert_id;
     echo json_encode([
-        'success' => true,
-        'message' => 'Fornecedor inserido com sucesso!',
-        'idFornecedor' => $idInserido
+        'success' => true, 
+        'message' => 'Produto inserido com sucesso!',
+        'idProduto' => $idProduto
     ]);
 } else {
-    // Retorna o erro específico do banco de dados
-    echo json_encode(['success' => false, 'message' => 'Erro no registro do fornecedor: ' . $stmt->error]);
+    echo json_encode(['success' => false, 'message' => 'Erro no registro do produto: ' . $stmt->error]);
 }
 
 // --- Fechamento da Conexão ---
+
 $stmt->close();
 $con->close();
-
 /*
- * Cadastrar novos fornecedores comando insomnia web
- {
-    "Nome": "Tech Suprimentos S.A.",
-    "Cnpj": "00.000.000/0001-00",
-    "nmResponsavel": "João da Silva",
-    "nrContato": "(11) 98765-4321",
-    "flListaNegra": "N"
+{
+    "nmProduto": "Smart TV 55 polegadas 4K",
+    "nrQuantidade": "50",
+    "nrIdentificacao": "STV-55K4-ABC",
+    "Valor": "3500.00",
+    "Disponivel": "S",
+    "idMarca": 2
 }
+
+http://localhost/cadProduto.php --- Linik Insomnia
+
 */
 ?>
