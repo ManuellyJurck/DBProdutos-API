@@ -42,4 +42,9 @@ echo json_encode($response, JSON_UNESCAPED_UNICODE);
 
 // Fechar a conexão com o banco de dados
 $con->close();
+/*
+link insomnia - http://localhost/consultaMarca.php
+
+não há comando de4 consulta, é só dar um send
+*/
 ?>
