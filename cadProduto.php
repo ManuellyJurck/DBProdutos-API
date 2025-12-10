@@ -34,11 +34,7 @@ $Disponivel      = strtoupper(trim($jsonParam['Disponivel'] ?? 'N')); // Padrão
 // O campo idMarca é INT, chave estrangeira.
 $idMarca         = intval($jsonParam['idMarca'] ?? 0);
 
-// Uma validação básica para garantir que campos obrigatórios não estejam vazios
-if (empty($nmProduto) || empty($nrQuantidade) || empty($nrIdentificacao) || empty($Valor) || $idMarca <= 0) {
-    echo json_encode(['success' => false, 'message' => 'Campos obrigatórios (nmProduto, nrQuantidade, nrIdentificacao, Valor, idMarca) não podem estar vazios.']);
-    exit;
-}
+
 
 // --- Preparação da Consulta INSERT ---
 
